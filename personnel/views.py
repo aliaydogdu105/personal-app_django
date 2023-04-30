@@ -1,5 +1,5 @@
 from .models import Department, Personnel
-from .serializers import DepartmentSerializer, PersonnelSerializer
+from .serializers import DepartmentSerializer, PersonnelSerializer, DepartmentPersonnelSerializer
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from .permissions import IsStafforReadOnly, IsOwnerAndStaffOrReadOnly
@@ -40,8 +40,40 @@ class PersonnelListCreateView(generics.ListCreateAPIView):
         person.save()
         return person
 
-
 class PersonalGetUpdateDelete(generics.RetrieveUpdateDestroyAPIView):
     queryset = Personnel.objects.all()
     serializer_class=PersonnelSerializer
-    permission_classes = [IsAuthenticated, IsOwnerAndStaffOrReadOnly]
+    # permission_classes = [IsAuthenticated, IsOwnerAndStaffOrReadOnly]
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if self.request.user.is_staff and (instance.create_user == self.request.user):
+            return self.update(request, *args, **kwargs)
+        else:
+            data = {
+                "message": "You are not authorized to perform this operation"
+            }
+            return Response(data, status=status.HTTP_401_UNAUTHORIZED)
+        
+    def delete(self, request, *args, **kwargs):
+        if request.user.is_superuser:
+            return self.destroy(request, *args, **kwargs)
+        else:
+            data = {
+                "message": "You are not authorized to perform this operation"
+            }
+            return Response(data, status=status.HTTP_401_UNAUTHORIZED)
+
+class DepartmentPersonnelView(generics.ListAPIView):
+    serializer_class = DepartmentPersonnelSerializer
+    queryset = Department.objects.all()
+    
+    def get_queryset(self):
+        name = self.kwargs["department"]
+        return Department.objects.filter(name__iexact=name) #iexact:upper or lower case is unimportant
+    
+class Custom(generics.RetrieveAPIView):
+    serializer_class = DepartmentPersonnelSerializer
+    queryset = Department.objects.all()
+    lookup_field= "name"
